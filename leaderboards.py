@@ -3,6 +3,17 @@ from pymongo import MongoClient
 import db_helpers
 from discord import app_commands
 from typing import List
+import os
+from dotenv import load_dotenv
+load_dotenv()
+
+### Configuration
+bot_user_id = 1049433791900422245
+#bot_user_id = 960877380644270140
+leaderboards_channel_id = 1108988733170143273
+#leaderboards_channel_id = 1109111576562245722
+server_id = '827233457226514442'
+#server_id = '763051850785488906'
 
 ### Discord Connect
 intents = discord.Intents.default()
@@ -10,14 +21,7 @@ intents.message_content = True
 #bot = commands.Bot(command_prefix='!', intents=intents)
 client = discord.Client(intents=intents)
 tree = app_commands.CommandTree(client)
-#client_token = 'MTA0OTQzMzc5MTkwMDQyMjI0NQ.G0IhLC.JjpnGvv4hux_LB_nRicYY3aG_1_bcXueDkD-Rk'
-client_token = 'OTYwODc3MzgwNjQ0MjcwMTQw.Gvegxi.71GnNCxwFSL2bx2mtJ2vw1jeaeN00v8dgyPpBA'
-bot_user_id = 1049433791900422245
-bot_user_id = 960877380644270140
-leaderboards_channel_id = 1108988733170143273
-leaderboards_channel_id = 1109111576562245722
-server_id = '827233457226514442'
-server_id = '763051850785488906'
+client_token = os.getenv("token")
 
 ### DB Connect
 mango_url = "mongodb+srv://boomerbot:7ih8hP4FFEieoe3W@cluster0.6dd0yse.mongodb.net/?retryWrites=true&w=majority"
