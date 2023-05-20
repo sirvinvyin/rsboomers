@@ -24,7 +24,7 @@ tree = app_commands.CommandTree(client)
 client_token = os.getenv("token")
 
 ### DB Connect
-mango_url = "mongodb+srv://boomerbot:7ih8hP4FFEieoe3W@cluster0.6dd0yse.mongodb.net/?retryWrites=true&w=majority"
+mango_url = os.getenv("db_url")
 cluster = MongoClient(mango_url)
 db = cluster["UserData"]
 boss_list = []
