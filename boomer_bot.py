@@ -4,6 +4,7 @@ import leaderboards_helper
 from discord import app_commands
 from discord.ext import tasks
 from typing import List
+from itertools import cycle
 import os
 from datetime import datetime
 
@@ -37,6 +38,11 @@ db = cluster["UserData"]
 boss_list = []
 boss_sub_list = []
 
+# Owner - 735571256526504008
+# Staff - 737466594783133777
+def is_staff(interaction: discord.Interaction):
+    True if (interaction.user.id == 735571256526504008 or interaction.user.id == 737466594783133777) else False
+    
 ### Locally stored boss list and boss category list for dropdown options.
 def refresh_boss_list():
     global boss_list
@@ -108,6 +114,7 @@ async def add_boss_category(interaction, update_field: str, update_value: str):
 # Optional discord_id field allows another user to input a preferred name.
 # TODO: maybe limit option to update another user based on permissions.
 @tree.command(name = "add_rsn", description = "Add RSN", guild=discord.Object(id=server_id))
+@app_commands.check(is_staff)
 async def add_rsn(interaction, rsn: str, discord_id: str=None):
     if discord_id == None:
         discord_id = interaction.user.id
@@ -158,6 +165,7 @@ async def category_id_autocompletion(
 # TODO: limit approvers.
 # TODO: get data from db instead of reading off of message string.
 @client.event
+@app_commands.check(is_staff)
 async def on_raw_reaction_add(payload):
     if payload.user_id in approvers:
         guild = client.get_guild(payload.guild_id)
@@ -187,12 +195,22 @@ reactions = ['✅', '❌']
 @client.event
 async def on_message(message):
     channel = message.channel
+    # Add Brown_Circle to Gold
+    if message.author.id == 194285447206273025:
+        message.add_reaction('brown_circle')
     if message.content.startswith('Time Updated') and message.author.id == bot_user_id:
         for reaction in reactions:
             await message.add_reaction(reaction)
 
+# Keep Bot Alive
+randomCycle = cycle(['Runescape', 'Runescape '])
+@tasks.loop(seconds=500)
+async def change_cycle():
+    await client.change_presence(activity=discord.Game(next(randomCycle)))
+
 @client.event
 async def on_ready():
+    change_cycle.start()
     await tree.sync(guild=discord.Object(id=server_id))
     print("Ready!")
 
