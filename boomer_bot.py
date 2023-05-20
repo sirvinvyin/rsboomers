@@ -23,10 +23,13 @@ client = discord.Client(intents=intents)
 tree = app_commands.CommandTree(client)
 #client_token = os.getenv("token")
 client_token = os.environ.get('token')
+print(client_token)
 
 ### DB Connect
 #mango_url = os.getenv("db_url")
-mango_url = os.environ.get('db_url')
+db_data = os.environ.get('db_url')
+mango_url = 'mongodb+srv://{}/?retryWrites=true'.format(db_data)
+print(mango_url)
 cluster = MongoClient(mango_url)
 db = cluster["UserData"]
 boss_list = []
