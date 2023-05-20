@@ -4,8 +4,8 @@ import db_helpers
 from discord import app_commands
 from typing import List
 import os
-from dotenv import load_dotenv
-load_dotenv()
+#from dotenv import load_dotenv
+#load_dotenv()
 
 ### Configuration
 bot_user_id = 1049433791900422245
@@ -21,10 +21,12 @@ intents.message_content = True
 #bot = commands.Bot(command_prefix='!', intents=intents)
 client = discord.Client(intents=intents)
 tree = app_commands.CommandTree(client)
-client_token = os.getenv("token")
+#client_token = os.getenv("token")
+client_token = os.environ.get('token')
 
 ### DB Connect
-mango_url = os.getenv("db_url")
+#mango_url = os.getenv("db_url")
+mango_url = os.environ.get('db_url')
 cluster = MongoClient(mango_url)
 db = cluster["UserData"]
 boss_list = []
