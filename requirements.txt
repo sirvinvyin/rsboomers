@@ -1,2 +1,2 @@
-discord==2.1.0
-pymongo==4.3.3
+discord
+pymongo
