@@ -42,7 +42,7 @@ boss_sub_list = []
 # Staff - 737466594783133777
 def is_staff(interaction: discord.Interaction):
     True if (interaction.user.id == 735571256526504008 or interaction.user.id == 737466594783133777) else False
-    
+
 ### Locally stored boss list and boss category list for dropdown options.
 def refresh_boss_list():
     global boss_list
@@ -207,6 +207,11 @@ randomCycle = cycle(['Runescape', 'Runescape '])
 @tasks.loop(seconds=500)
 async def change_cycle():
     await client.change_presence(activity=discord.Game(next(randomCycle)))
+    ### testing
+    dt_string = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+    test_channel = client.get_channel(1050135467603013653)
+    test_message = await test_channel.fetch_message(1109628070329077780)
+    await test_message.edit(content=dt_string)
 
 @client.event
 async def on_ready():
