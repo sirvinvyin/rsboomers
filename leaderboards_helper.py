@@ -1,5 +1,6 @@
 from pymongo import MongoClient
 import pymongo
+import discord
 
 ################
 #### BOSSES ####
@@ -133,3 +134,25 @@ def get_top_x(db, boss_id, category_id):
     limit = db['bosses'].find(query)[0]['categories'][category_id]['limit']
     top_x = db[boss_id].find({"{}.pending".format(category_id):0}).sort("{}.seconds".format(category_id), pymongo.ASCENDING).limit(limit)
     return top_x
+
+### Refreshes leaderboards
+def update_leaderboards(db, boss_id):
+    boss_data = db.bosses.find({'_id': boss_id})[0]
+    boss_title = boss_data['name']
+    hex_int = int(boss_data['color'], base=16)
+    embed = discord.Embed(title=boss_data['name'], description=None, color=hex_int)
+    embed.set_thumbnail(url=boss_data['image'])
+    for category_id in boss_data['categories']:
+        description = boss_data['categories'][category_id]['name']
+        if category_id == boss_id:
+            description = "Top Times"
+        rank = 1
+        return_string = ""
+        for i in get_top_x(db, boss_id, category_id):
+            rsn = get_rsn(db, i['_id'])
+            seconds = i[category_id]['seconds']
+            m, s = divmod(seconds, 60)
+            return_string+="{}. {}: {:02d}:{:02d}\n".format(rank, rsn, m, s)
+            rank+=1
+        embed.add_field(name=description, value=return_string, inline=False)
+    return embed

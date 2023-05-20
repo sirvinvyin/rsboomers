@@ -1,19 +1,21 @@
 import discord
 from pymongo import MongoClient
-import db_helpers
+import leaderboards_helper
 from discord import app_commands
+from discord.ext import tasks
 from typing import List
 import os
-#from dotenv import load_dotenv
-#load_dotenv()
+from datetime import datetime
 
 ### Configuration
-bot_user_id = 1049433791900422245
-#bot_user_id = 960877380644270140
-leaderboards_channel_id = 1108988733170143273
-#leaderboards_channel_id = 1109111576562245722
-server_id = '827233457226514442'
-#server_id = '763051850785488906'
+#bot_user_id = 1049433791900422245
+#leaderboards_channel_id = 1108988733170143273
+#server_id = '827233457226514442'
+bot_user_id = 960877380644270140
+leaderboards_channel_id = 1109111576562245722
+server_id = '763051850785488906'
+
+approvers = [164199589614845952, 744266638857207878]
 
 ### Discord Connect
 intents = discord.Intents.default()
@@ -35,6 +37,7 @@ db = cluster["UserData"]
 boss_list = []
 boss_sub_list = []
 
+### Locally stored boss list and boss category list for dropdown options.
 def refresh_boss_list():
     global boss_list
     global boss_sub_list
@@ -49,27 +52,7 @@ refresh_boss_list()
 print(boss_list)
 print(boss_sub_list)
 
-def update_leaderboards(boss_id):
-    boss_data = db.bosses.find({'_id': boss_id})[0]
-    boss_title = boss_data['name']
-    hex_int = int(boss_data['color'], base=16)
-    embed = discord.Embed(title=boss_data['name'], description=None, color=hex_int)
-    embed.set_thumbnail(url=boss_data['image'])
-    for category_id in boss_data['categories']:
-        description = boss_data['categories'][category_id]['name']
-        if category_id == boss_id:
-            description = "Top Times"
-        rank = 1
-        return_string = ""
-        for i in db_helpers.get_top_x(db, boss_id, category_id):
-            rsn = db_helpers.get_rsn(db, i['_id'])
-            seconds = i[category_id]['seconds']
-            m, s = divmod(seconds, 60)
-            return_string+="{}. {}: {:02d}:{:02d}\n".format(rank, rsn, m, s)
-            rank+=1
-        embed.add_field(name=description, value=return_string, inline=False)
-    return embed
-
+### Help command. Probably should be expanded on.
 @tree.command(name = "help", description = "help", guild=discord.Object(id=server_id))
 async def help(interaction):
     embed = discord.Embed(title='Boss List', description="name | id", color=0x00FFFF)
@@ -82,9 +65,11 @@ async def help(interaction):
         embed.add_field(name=field_name, value=boss_string, inline=False)
     await interaction.response.send_message(embed=embed)
 
+### Add boss command.
+# 1. Adds boss to db, 2. creates boss collection 3. creates placeholder message in leaderboards channel
 @tree.command(name = "add_boss", description = "Add Boss", guild=discord.Object(id=server_id))
 async def add_boss(interaction, boss_id: str, boss_name: str, category_id: str, category_name: str, image_url: str, limit: int, color: str):
-    boss_response = db_helpers.add_boss(db, boss_id, boss_name, category_id, category_name, image_url, limit, color)
+    boss_response = leaderboards_helper.add_boss(db, boss_id, boss_name, category_id, category_name, image_url, limit, color)
     hex_int = int(color, base=16)
     message = "Boss already exists"
     if boss_response == 1:
@@ -94,18 +79,20 @@ async def add_boss(interaction, boss_id: str, boss_name: str, category_id: str, 
         embed.set_thumbnail(url=image_url)
         leaderboards_channel = client.get_channel(leaderboards_channel_id)
         message = await leaderboards_channel.send(embed=embed)
-        db_helpers.update_boss(db, boss_id, 'message_id', message.id)
+        leaderboards_helper.update_boss(db, boss_id, 'message_id', message.id)
         refresh_boss_list()
 
+### Add boss category command (eg. solo_cm, solo_normal for cox)
 @tree.command(name = "add_boss_category", description = "Add Boss Category", guild=discord.Object(id=server_id))
 async def add_boss_category(interaction, boss_id: str, category_id: str, category_name: str, limit: int):
-    boss_response = db_helpers.add_boss_category(db, boss_id, category_id, category_name, limit)
+    boss_response = leaderboards_helper.add_boss_category(db, boss_id, category_id, category_name, limit)
     message = "Boss does not exist. Enter boss via /add_boss command."
     if boss_response == 1:
         message = "Boss Updated!"
         refresh_boss_list()
     await interaction.response.send_message(message)
 
+### Update boss command. Used to update boss metadata for example how many records are shown in leaderboard.
 @tree.command(name = "update_boss", description = "Update Boss Metadata", guild=discord.Object(id=server_id))
 async def add_boss_category(interaction, update_field: str, update_value: str):
     if update_field.str.contains('limit'):
@@ -117,18 +104,23 @@ async def add_boss_category(interaction, update_field: str, update_value: str):
         refresh_boss_list()
     await interaction.response.send_message(message)
 
+### Map rsn/preferred name to discord_id command. Required to enter time.
+# Optional discord_id field allows another user to input a preferred name.
+# TODO: maybe limit option to update another user based on permissions.
 @tree.command(name = "add_rsn", description = "Add RSN", guild=discord.Object(id=server_id))
 async def add_rsn(interaction, rsn: str, discord_id: str=None):
     if discord_id == None:
         discord_id = interaction.user.id
     else:
         discord_id = int(discord_id)
-    db_helpers.add_user(db, discord_id, rsn)
+    leaderboards_helper.add_user(db, discord_id, rsn)
     message = "RSN Added!"
-    if db_helpers.check_id(db, discord_id) == 1:
+    if leaderboards_helper.check_id(db, discord_id) == 1:
         message = "RSN Updated!"
     await interaction.response.send_message(message)
 
+### Adds time to database.
+# TODO: update pending to be message_id instead of hardcoded 1. Use message_id when approving / declining.
 @tree.command(name = "add_time", description = "Add Time", guild=discord.Object(id=server_id))
 async def add_time(interaction, boss_id: str, category_id: str, minute: int, seconds: int, discord_id: str=None):
     seconds = minute*60+seconds
@@ -136,8 +128,8 @@ async def add_time(interaction, boss_id: str, category_id: str, minute: int, sec
         discord_id = interaction.user.id
     else:
         discord_id = int(discord_id)
-    if db_helpers.check_id(db, discord_id) == 1:
-        message = db_helpers.add_time(db, boss_id, category_id, discord_id, seconds)
+    if leaderboards_helper.check_id(db, discord_id) == 1:
+        message = leaderboards_helper.add_time(db, boss_id, category_id, discord_id, seconds)
     else:
         message = "Enter RSN via /add_rsn command first."
     await interaction.response.send_message(message)
@@ -162,11 +154,12 @@ async def category_id_autocompletion(
         data.append(app_commands.Choice(name=category_id, value=category_id))
     return data
 
-
+### Approval event for submitted time.
+# TODO: limit approvers.
+# TODO: get data from db instead of reading off of message string.
 @client.event
 async def on_raw_reaction_add(payload):
-    #change this to list of approved user ids
-    if payload.user_id != bot_user_id:
+    if payload.user_id in approvers:
         guild = client.get_guild(payload.guild_id)
         channel = guild.get_channel(payload.channel_id)
         message = await channel.fetch_message(payload.message_id)
@@ -178,9 +171,9 @@ async def on_raw_reaction_add(payload):
             boss_id = list[1]
             category_id = list[2]
             seconds = list[3]
-            db_helpers.remove_pending(db, boss_id, category_id, discord_id, seconds)
+            leaderboards_helper.remove_pending(db, boss_id, category_id, discord_id, seconds)
             await channel.send('Time Approved.')
-            embed = update_leaderboards(boss_id)
+            embed = leaderboards_helper.update_leaderboards(db, boss_id)
             leaderboards_channel = client.get_channel(leaderboards_channel_id)
             boss_message_id = db['bosses'].find({'_id': boss_id})[0]['message_id']
             message = await leaderboards_channel.fetch_message(boss_message_id)
@@ -188,6 +181,8 @@ async def on_raw_reaction_add(payload):
         elif str(payload.emoji) == '❌':
             await channel.send('Time Denied.')
 
+### Add emoji reactions to message.
+# TODO: Can maybe use message_id instead of startswith if message_id is stored.
 reactions = ['✅', '❌']
 @client.event
 async def on_message(message):
@@ -195,7 +190,6 @@ async def on_message(message):
     if message.content.startswith('Time Updated') and message.author.id == bot_user_id:
         for reaction in reactions:
             await message.add_reaction(reaction)
-
 
 @client.event
 async def on_ready():
