@@ -110,7 +110,6 @@ async def add_boss_category(interaction, update_field: str, update_value: str):
 
 ### Map rsn/preferred name to discord_id command. Required to enter time.
 # Optional discord_id field allows another user to input a preferred name.
-# TODO: maybe limit option to update another user based on permissions.
 @tree.command(name = "add_rsn", description = "Add RSN", guild=discord.Object(id=server_id))
 @app_commands.check(is_staff)
 async def add_rsn(interaction, rsn: str, discord_id: str=None):
@@ -125,7 +124,6 @@ async def add_rsn(interaction, rsn: str, discord_id: str=None):
     await interaction.response.send_message(message)
 
 ### Adds time to database.
-# TODO: update pending to be message_id instead of hardcoded 1. Use message_id when approving / declining.
 @tree.command(name = "add_time", description = "Add Time", guild=discord.Object(id=server_id))
 async def add_time(interaction, boss_id: str, category_id: str, minute: int, seconds: int, discord_id: str=None):
     seconds = minute*60+seconds
@@ -136,8 +134,6 @@ async def add_time(interaction, boss_id: str, category_id: str, minute: int, sec
     if leaderboards_helper.check_id(db, discord_id) == 1:
         await interaction.response.send_message('Time Updated. Awaiting confirmation.')
         message = await interaction.original_response()
-        print(message)
-        print(message.id)
         reactions = ['✅', '❌']
         for reaction in reactions:
             await message.add_reaction(reaction)
@@ -167,12 +163,9 @@ async def category_id_autocompletion(
     return data
 
 ### Approval event for submitted time.
-# TODO: limit approvers.
-# TODO: get data from db instead of reading off of message string.
 @client.event
 @app_commands.check(is_staff)
 async def on_raw_reaction_add(payload):
-    print('hi')
     if (payload.message_id in pending_message_list) and str(payload.emoji) in ['✅', '❌']:
         guild = client.get_guild(payload.guild_id)
         channel = guild.get_channel(payload.channel_id)
