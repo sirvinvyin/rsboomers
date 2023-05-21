@@ -88,9 +88,20 @@ def get_rsn(db, discord_id):
 #### RECORDS ####
 #################
 
+### Adds time to pending collection
+def add_to_pending(db, boss_id, category_id, discord_id, seconds, message_id):
+    entry = {
+        "_id": message_id,
+        "boss_id": boss_id,
+        "category_id": category_id,
+        "discord_id": discord_id,
+        "seconds": seconds
+    }
+    db['pending_times'].insert_one(entry)
+
 ### Inputs or updates leaderboard time for a user
 def write_record(db, boss_id, category_id, discord_id, seconds):
-    data = {'seconds': seconds, 'pending': 1}
+    data = {'seconds': seconds}
     entry = {
         "_id": discord_id,
         category_id: data
@@ -105,14 +116,14 @@ def write_record(db, boss_id, category_id, discord_id, seconds):
         print('updating record')
 
 ### Ensures boss exists in DB.
-def add_time(db, boss_id, category_id, discord_id, seconds):
+def add_time(db, boss_id, category_id, discord_id, seconds, message_id):
     message = 'Time Updated: {}|{}|{}|{}. Awaiting confirmation'.format(discord_id, boss_id, category_id, seconds)
     query = {'_id': boss_id, 'categories.{}'.format(category_id):{ "$exists": True }}
     if db.bosses.count_documents({"_id": boss_id}) > 0:
         print('Boss Exists')
         if db.bosses.count_documents(query) > 0:
             print('Boss Category Exists')
-            write_record(db, boss_id, category_id, discord_id, seconds)
+            write_record(db, boss_id, category_id, discord_id, seconds, message_id)
         else:
             print('Boss Category does not exist')
             message = 'Incorrect category_id. Check /boss for available bosses'
@@ -121,18 +132,12 @@ def add_time(db, boss_id, category_id, discord_id, seconds):
         message = 'Incorrect boss_id. Check /boss for available bosses'
     return message
 
-### Removes pending state in db after approval
-def remove_pending(db, boss_id, category_id, discord_id, seconds):
-    boss_col = db[boss_id]
-    query = {"_id": discord_id}
-    boss_col.update_one(query, {"$set": {'{}.pending'.format(category_id): 0}})
-
 ### Gets top time for leaderboard where x is limit set in bosses collection
 def get_top_x(db, boss_id, category_id):
     query = {"_id": boss_id}
     boss_col = db[boss_id]
     limit = db['bosses'].find(query)[0]['categories'][category_id]['limit']
-    top_x = db[boss_id].find({"{}.pending".format(category_id):0}).sort("{}.seconds".format(category_id), pymongo.ASCENDING).limit(limit)
+    top_x = db[boss_id].find({category_id: {"$exists":True}}).sort("{}.seconds".format(category_id), pymongo.ASCENDING).limit(limit)
     return top_x
 
 ### Refreshes leaderboards

@@ -9,39 +9,32 @@ import os
 from datetime import datetime
 
 ### Configuration
-#bot_user_id = 1049433791900422245
-#leaderboards_channel_id = 1108988733170143273
-#server_id = '827233457226514442'
 bot_user_id = 960877380644270140
-leaderboards_channel_id = 1109111576562245722
-server_id = '763051850785488906'
-
-approvers = [164199589614845952, 744266638857207878]
+client_token = os.environ.get('token')
+db_url = os.environ.get('db_url')
+db_name = os.environ.get('db_name')
 
 ### Discord Connect
 intents = discord.Intents.default()
 intents.message_content = True
-#bot = commands.Bot(command_prefix='!', intents=intents)
 client = discord.Client(intents=intents)
 tree = app_commands.CommandTree(client)
-#client_token = os.getenv("token")
-client_token = os.environ.get('token')
-print(client_token)
 
 ### DB Connect
-#mango_url = os.getenv("db_url")
-db_data = os.environ.get('db_url')
-mango_url = 'mongodb+srv://{}/?retryWrites=true'.format(db_data)
-print(mango_url)
+mango_url = 'mongodb+srv://{}/?retryWrites=true'.format(db_url)
 cluster = MongoClient(mango_url)
-db = cluster["UserData"]
+db = cluster[db_name]
 boss_list = []
 boss_sub_list = []
+pending_message_list = []
 
+leaderboards_channel_id = db['config'].find()[0]['leaderboard_id']
+server_id = db['config'].find()[0]['server_id']
 # Owner - 735571256526504008
 # Staff - 737466594783133777
+approver_list = [735571256526504008, 737466594783133777, 164199589614845952]
 def is_staff(interaction: discord.Interaction):
-    True if (interaction.user.id == 735571256526504008 or interaction.user.id == 737466594783133777) else False
+    True if (interaction.user.id in approver_list) else False
 
 ### Locally stored boss list and boss category list for dropdown options.
 def refresh_boss_list():
@@ -54,9 +47,14 @@ def refresh_boss_list():
         for category in boss['categories']:
             boss_sub_list.append(category)
 
+def refresh_pending_messages():
+    global pending_message_list
+    pending_message_list = []
+    for item in db['pending_times'].find():
+        pending_message_list.append(item['_id'])
+
 refresh_boss_list()
-print(boss_list)
-print(boss_sub_list)
+refresh_pending_messages()
 
 ### Help command. Probably should be expanded on.
 @tree.command(name = "help", description = "help", guild=discord.Object(id=server_id))
@@ -136,10 +134,17 @@ async def add_time(interaction, boss_id: str, category_id: str, minute: int, sec
     else:
         discord_id = int(discord_id)
     if leaderboards_helper.check_id(db, discord_id) == 1:
-        message = leaderboards_helper.add_time(db, boss_id, category_id, discord_id, seconds)
+        await interaction.response.send_message('Time Updated. Awaiting confirmation.')
+        message = await interaction.original_response()
+        print(message)
+        print(message.id)
+        reactions = ['✅', '❌']
+        for reaction in reactions:
+            await message.add_reaction(reaction)
+        leaderboards_helper.add_to_pending(db, boss_id, category_id, discord_id, seconds, message.id)
+        refresh_pending_messages()
     else:
-        message = "Enter RSN via /add_rsn command first."
-    await interaction.response.send_message(message)
+        await interaction.response.send_message("Enter RSN via /add_rsn command first.")
 
 @add_time.autocomplete('boss_id')
 async def boss_id_autocompletion(
@@ -167,51 +172,39 @@ async def category_id_autocompletion(
 @client.event
 @app_commands.check(is_staff)
 async def on_raw_reaction_add(payload):
-    if payload.user_id in approvers:
+    print('hi')
+    if (payload.message_id in pending_message_list) and str(payload.emoji) in ['✅', '❌']:
         guild = client.get_guild(payload.guild_id)
         channel = guild.get_channel(payload.channel_id)
-        message = await channel.fetch_message(payload.message_id)
-        values = message.content.split(': ')[1].split('.')[0]
-        list = values.split("|")
-        print(list)
+        payload_message = await channel.fetch_message(payload.message_id)
         if str(payload.emoji) == '✅':
-            discord_id = int(list[0])
-            boss_id = list[1]
-            category_id = list[2]
-            seconds = list[3]
-            leaderboards_helper.remove_pending(db, boss_id, category_id, discord_id, seconds)
+            data = db['pending_times'].find({"_id": payload.message_id})[0]
+            leaderboards_helper.write_record(db, data['boss_id'], data['category_id'], data['discord_id'], data['seconds'])
             await channel.send('Time Approved.')
-            embed = leaderboards_helper.update_leaderboards(db, boss_id)
+            embed = leaderboards_helper.update_leaderboards(db, data['boss_id'])
             leaderboards_channel = client.get_channel(leaderboards_channel_id)
-            boss_message_id = db['bosses'].find({'_id': boss_id})[0]['message_id']
-            message = await leaderboards_channel.fetch_message(boss_message_id)
-            await message.edit(embed=embed)
+            boss_message_id = db['bosses'].find({'_id': data['boss_id']})[0]['message_id']
+            boss_message = await leaderboards_channel.fetch_message(boss_message_id)
+            await boss_message.edit(embed=embed)
         elif str(payload.emoji) == '❌':
             await channel.send('Time Denied.')
+        query = {"_id": payload.message_id}
+        db['pending_times'].delete_many(query)
+        await payload_message.delete()
 
 ### Add emoji reactions to message.
-# TODO: Can maybe use message_id instead of startswith if message_id is stored.
-reactions = ['✅', '❌']
 @client.event
 async def on_message(message):
     channel = message.channel
     # Add Brown_Circle to Gold
     if message.author.id == 194285447206273025:
         message.add_reaction('brown_circle')
-    if message.content.startswith('Time Updated') and message.author.id == bot_user_id:
-        for reaction in reactions:
-            await message.add_reaction(reaction)
 
 # Keep Bot Alive
 randomCycle = cycle(['Runescape', 'Runescape 3'])
 @tasks.loop(seconds=400)
 async def change_cycle():
     await client.change_presence(activity=discord.Game(next(randomCycle)))
-    ### testing
-    dt_string = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-    test_channel = client.get_channel(1050135467603013653)
-    test_message = await test_channel.fetch_message(1109628070329077780)
-    await test_message.edit(content=dt_string)
 
 @client.event
 async def on_ready():
