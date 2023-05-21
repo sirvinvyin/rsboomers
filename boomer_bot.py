@@ -203,7 +203,7 @@ async def on_message(message):
             await message.add_reaction(reaction)
 
 # Keep Bot Alive
-randomCycle = cycle(['Runescape', 'Runescape '])
+randomCycle = cycle(['Runescape', 'Runescape 3'])
 @tasks.loop(seconds=500)
 async def change_cycle():
     await client.change_presence(activity=discord.Game(next(randomCycle)))
