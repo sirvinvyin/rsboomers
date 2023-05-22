@@ -28,8 +28,8 @@ boss_list = []
 boss_sub_list = []
 pending_message_list = []
 
-leaderboards_channel_id = 1108988733170143273#db['config'].find()[0]['leaderboard_id']
-server_id = '827233457226514442'#db['config'].find()[0]['server_id']
+leaderboards_channel_id = db['config'].find()[0]['leaderboard_id']
+server_id = db['config'].find()[0]['server_id']
 
 # Owner - 735571256526504008
 # Staff - 737466594783133777
