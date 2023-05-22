@@ -33,10 +33,8 @@ server_id = db['config'].find()[0]['server_id']
 
 # Owner - 735571256526504008
 # Staff - 737466594783133777
-approver_list = [735571256526504008, 737466594783133777, 164199589614845952]
+approver_list = [735571256526504008, 737466594783133777, 164199589614845952, 744266638857207878]
 def is_staff(interaction: discord.Interaction):
-    print(interaction.user.id)
-    print(interaction.user.id in approver_list)
     True if (interaction.user.id in approver_list) else False
 
 ### Locally stored boss list and boss category list for dropdown options.
@@ -102,7 +100,7 @@ async def add_boss_category(interaction, boss_id: str, category_id: str, categor
 ### Update boss command. Used to update boss metadata for example how many records are shown in leaderboard.
 @tree.command(name = "update_boss", description = "Update Boss Metadata", guild=discord.Object(id=server_id))
 async def add_boss_category(interaction, boss_id: str, update_field: str, update_value: str):
-    if update_field.str.contains('limit'):
+    if 'limit' in update_field:
         update_value = int(update_value)
     response = update_boss(db, boss_id, update_field, update_value)
     message = 'Boss does not exist. Enter boss via /add_boss command.'
@@ -138,6 +136,7 @@ async def add_time(interaction, boss_id: str, category_id: str, minute: int, sec
     else:
         discord_id = int(discord_id)
     if leaderboards_helper.check_id(db, discord_id) == 1:
+        message = "Submitted time: {} min {} seconds for {} {}. Pending Approval".format(minute, seconds, boss_id, category_id)
         await interaction.response.send_message('Time Updated. Awaiting confirmation.')
         message = await interaction.original_response()
         reactions = ['✅', '❌']
