@@ -28,12 +28,15 @@ boss_list = []
 boss_sub_list = []
 pending_message_list = []
 
-leaderboards_channel_id = db['config'].find()[0]['leaderboard_id']
-server_id = db['config'].find()[0]['server_id']
+leaderboards_channel_id = 1108988733170143273#db['config'].find()[0]['leaderboard_id']
+server_id = '827233457226514442'#db['config'].find()[0]['server_id']
+
 # Owner - 735571256526504008
 # Staff - 737466594783133777
 approver_list = [735571256526504008, 737466594783133777, 164199589614845952]
 def is_staff(interaction: discord.Interaction):
+    print(interaction.user.id)
+    print(interaction.user.id in approver_list)
     True if (interaction.user.id in approver_list) else False
 
 ### Locally stored boss list and boss category list for dropdown options.
@@ -98,7 +101,7 @@ async def add_boss_category(interaction, boss_id: str, category_id: str, categor
 
 ### Update boss command. Used to update boss metadata for example how many records are shown in leaderboard.
 @tree.command(name = "update_boss", description = "Update Boss Metadata", guild=discord.Object(id=server_id))
-async def add_boss_category(interaction, update_field: str, update_value: str):
+async def add_boss_category(interaction, boss_id: str, update_field: str, update_value: str):
     if update_field.str.contains('limit'):
         update_value = int(update_value)
     response = update_boss(db, boss_id, update_field, update_value)
@@ -111,16 +114,19 @@ async def add_boss_category(interaction, update_field: str, update_value: str):
 ### Map rsn/preferred name to discord_id command. Required to enter time.
 # Optional discord_id field allows another user to input a preferred name.
 @tree.command(name = "add_rsn", description = "Add RSN", guild=discord.Object(id=server_id))
-@app_commands.check(is_staff)
+#@app_commands.check(is_staff)
 async def add_rsn(interaction, rsn: str, discord_id: str=None):
     if discord_id == None:
-        discord_id = interaction.user.id
+        if interaction.user.id in approver_list:
+            discord_id = interaction.user.id
+            leaderboards_helper.add_user(db, discord_id, rsn)
+            message = "RSN Added/Updated!"
+        else:
+            message = "Cannot update another user's info."
     else:
         discord_id = int(discord_id)
-    leaderboards_helper.add_user(db, discord_id, rsn)
-    message = "RSN Added!"
-    if leaderboards_helper.check_id(db, discord_id) == 1:
-        message = "RSN Updated!"
+        leaderboards_helper.add_user(db, discord_id, rsn)
+        message = "RSN Added/Updated!"
     await interaction.response.send_message(message)
 
 ### Adds time to database.
@@ -164,9 +170,8 @@ async def category_id_autocompletion(
 
 ### Approval event for submitted time.
 @client.event
-@app_commands.check(is_staff)
 async def on_raw_reaction_add(payload):
-    if (payload.message_id in pending_message_list) and str(payload.emoji) in ['✅', '❌']:
+    if (payload.message_id in pending_message_list) and str(payload.emoji) in ['✅', '❌'] and (payload.user_id in approver_list):
         guild = client.get_guild(payload.guild_id)
         channel = guild.get_channel(payload.channel_id)
         payload_message = await channel.fetch_message(payload.message_id)

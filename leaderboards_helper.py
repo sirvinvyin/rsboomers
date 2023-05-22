@@ -72,12 +72,13 @@ def check_id(db, discord_id):
 def add_user(db, discord_id, rsn):
     col = db['discord_rsn']
     query = {"_id": discord_id}
+    entry = {"_id": discord_id, "rsn": rsn}
     if col.count_documents(query) == 0:
-        entry = {"_id": discord_id, "rsn": rsn}
         col.insert_one(entry)
         print('inserting rsn')
     else:
-        print('rsn already exists')
+        col.update_one(query, {"$set": entry})
+        print('updating record')
 
 def get_rsn(db, discord_id):
     query = {"_id": discord_id}
