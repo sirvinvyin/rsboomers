@@ -1,1 +1,1 @@
-worker: python boomer_bot.py
+web: python boomer_bot.py
