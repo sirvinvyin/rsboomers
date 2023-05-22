@@ -120,6 +120,8 @@ async def add_rsn(interaction, rsn: str=None, discord_id: str=None):
             guild = await client.fetch_guild(server_id)
             user = await guild.fetch_member(discord_id)
             discord_name = user.nick
+            if discord_name == None:
+                discord_name = user.name
             leaderboards_helper.add_user(user_db, discord_id, discord_name, rsn)
             message = "RSN Added/Updated!"
         else:
@@ -129,6 +131,8 @@ async def add_rsn(interaction, rsn: str=None, discord_id: str=None):
         guild = await client.fetch_guild(server_id)
         user = await guild.fetch_member(discord_id)
         discord_name = user.nick
+        if discord_name == None:
+            discord_name = user.name
         leaderboards_helper.add_user(user_db, discord_id, discord_name, rsn)
         message = "RSN Added/Updated!"
     await interaction.response.send_message(message)
@@ -144,7 +148,8 @@ async def add_time(interaction, boss_id: str, category_id: str, minute: int, sec
     if leaderboards_helper.check_id(user_db, discord_id) == 0:
         guild = await client.fetch_guild(server_id)
         user = await guild.fetch_member(discord_id)
-        discord_name = user.nick
+        if discord_name == None:
+            discord_name = user.name
         leaderboards_helper.add_user(user_db, discord_id, discord_name, None)
     submit_message = "Submitted time: {} min {} seconds for {} {}. Pending Approval".format(minute, seconds, boss_id, category_id)
     await interaction.response.send_message(submit_message)
