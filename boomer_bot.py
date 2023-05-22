@@ -117,16 +117,18 @@ async def add_rsn(interaction, rsn: str=None, discord_id: str=None):
     if discord_id == None:
         if interaction.user.id in approver_list:
             discord_id = interaction.user.id
-            user = await client.fetch_user(discord_id)
-            discord_name = user.name
+            guild = await client.fetch_guild(server_id)
+            user = await guild.fetch_member(discord_id)
+            discord_name = user.nick
             leaderboards_helper.add_user(user_db, discord_id, discord_name, rsn)
             message = "RSN Added/Updated!"
         else:
             message = "Cannot update another user's info."
     else:
         discord_id = int(discord_id)
-        user = await client.fetch_user(discord_id)
-        discord_name = user.name
+        guild = await client.fetch_guild(server_id)
+        user = await guild.fetch_member(discord_id)
+        discord_name = user.nick
         leaderboards_helper.add_user(user_db, discord_id, discord_name, rsn)
         message = "RSN Added/Updated!"
     await interaction.response.send_message(message)
@@ -140,8 +142,9 @@ async def add_time(interaction, boss_id: str, category_id: str, minute: int, sec
     else:
         discord_id = int(discord_id)
     if leaderboards_helper.check_id(user_db, discord_id) == 0:
-        user = await client.fetch_user(discord_id)
-        discord_name = user.name
+        guild = await client.fetch_guild(server_id)
+        user = await guild.fetch_member(discord_id)
+        discord_name = user.nick
         leaderboards_helper.add_user(user_db, discord_id, discord_name, None)
     submit_message = "Submitted time: {} min {} seconds for {} {}. Pending Approval".format(minute, seconds, boss_id, category_id)
     await interaction.response.send_message(submit_message)
