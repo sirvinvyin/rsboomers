@@ -9,7 +9,6 @@ import os
 from datetime import datetime
 
 ### Configuration
-bot_user_id = 960877380644270140
 client_token = os.environ.get('token')
 db_url = os.environ.get('db_url')
 db_name = os.environ.get('db_name')
@@ -27,6 +26,7 @@ db = cluster[db_name]
 boss_list = []
 boss_sub_list = []
 pending_message_list = []
+user_db = cluster['Users']
 
 leaderboards_channel_id = db['config'].find()[0]['leaderboard_id']
 server_id = db['config'].find()[0]['server_id']
@@ -113,17 +113,21 @@ async def add_boss_category(interaction, boss_id: str, update_field: str, update
 # Optional discord_id field allows another user to input a preferred name.
 @tree.command(name = "add_rsn", description = "Add RSN", guild=discord.Object(id=server_id))
 #@app_commands.check(is_staff)
-async def add_rsn(interaction, rsn: str, discord_id: str=None):
+async def add_rsn(interaction, rsn: str=None, discord_id: str=None):
     if discord_id == None:
         if interaction.user.id in approver_list:
             discord_id = interaction.user.id
-            leaderboards_helper.add_user(db, discord_id, rsn)
+            user = await client.fetch_user(discord_id)
+            discord_name = user.name
+            leaderboards_helper.add_user(user_db, discord_id, discord_name, rsn)
             message = "RSN Added/Updated!"
         else:
             message = "Cannot update another user's info."
     else:
         discord_id = int(discord_id)
-        leaderboards_helper.add_user(db, discord_id, rsn)
+        user = await client.fetch_user(discord_id)
+        discord_name = user.name
+        leaderboards_helper.add_user(user_db, discord_id, discord_name, rsn)
         message = "RSN Added/Updated!"
     await interaction.response.send_message(message)
 
@@ -135,17 +139,18 @@ async def add_time(interaction, boss_id: str, category_id: str, minute: int, sec
         discord_id = interaction.user.id
     else:
         discord_id = int(discord_id)
-    if leaderboards_helper.check_id(db, discord_id) == 1:
-        message = "Submitted time: {} min {} seconds for {} {}. Pending Approval".format(minute, seconds, boss_id, category_id)
-        await interaction.response.send_message('Time Updated. Awaiting confirmation.')
-        message = await interaction.original_response()
-        reactions = ['✅', '❌']
-        for reaction in reactions:
-            await message.add_reaction(reaction)
-        leaderboards_helper.add_to_pending(db, boss_id, category_id, discord_id, seconds, message.id)
-        refresh_pending_messages()
-    else:
-        await interaction.response.send_message("Enter RSN via /add_rsn command first.")
+    if leaderboards_helper.check_id(user_db, discord_id) == 0:
+        user = await client.fetch_user(discord_id)
+        discord_name = user.name
+        leaderboards_helper.add_user(user_db, discord_id, discord_name, None)
+    submit_message = "Submitted time: {} min {} seconds for {} {}. Pending Approval".format(minute, seconds, boss_id, category_id)
+    await interaction.response.send_message(submit_message)
+    message = await interaction.original_response()
+    reactions = ['✅', '❌']
+    for reaction in reactions:
+        await message.add_reaction(reaction)
+    leaderboards_helper.add_to_pending(db, boss_id, category_id, discord_id, seconds, message.id)
+    refresh_pending_messages()
 
 @add_time.autocomplete('boss_id')
 async def boss_id_autocompletion(
@@ -178,7 +183,7 @@ async def on_raw_reaction_add(payload):
             data = db['pending_times'].find({"_id": payload.message_id})[0]
             leaderboards_helper.write_record(db, data['boss_id'], data['category_id'], data['discord_id'], data['seconds'])
             await channel.send('Time Approved.')
-            embed = leaderboards_helper.update_leaderboards(db, data['boss_id'])
+            embed = leaderboards_helper.update_leaderboards(db, user_db, data['boss_id'])
             leaderboards_channel = client.get_channel(leaderboards_channel_id)
             boss_message_id = db['bosses'].find({'_id': data['boss_id']})[0]['message_id']
             boss_message = await leaderboards_channel.fetch_message(boss_message_id)

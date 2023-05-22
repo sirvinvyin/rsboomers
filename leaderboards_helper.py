@@ -69,10 +69,10 @@ def check_id(db, discord_id):
 
 ### Adds user to database. Used to map discord_id to preferred name.
 ### Will update if id exists already.
-def add_user(db, discord_id, rsn):
-    col = db['discord_rsn']
+def add_user(user_db, discord_id, discord_name, rsn=None):
+    col = user_db['discord_users']
     query = {"_id": discord_id}
-    entry = {"_id": discord_id, "rsn": rsn}
+    entry = {"_id": discord_id, "discord_name": discord_name, "rsn": rsn}
     if col.count_documents(query) == 0:
         col.insert_one(entry)
         print('inserting rsn')
@@ -80,9 +80,9 @@ def add_user(db, discord_id, rsn):
         col.update_one(query, {"$set": entry})
         print('updating record')
 
-def get_rsn(db, discord_id):
+def get_discord_name(user_db, discord_id):
     query = {"_id": discord_id}
-    rsn = db['discord_rsn'].find(query)[0]['rsn']
+    rsn = user_db['discord_users'].find(query)[0]['discord_name']
     return rsn
 
 #################
@@ -142,7 +142,7 @@ def get_top_x(db, boss_id, category_id):
     return top_x
 
 ### Refreshes leaderboards
-def update_leaderboards(db, boss_id):
+def update_leaderboards(db, user_db, boss_id):
     boss_data = db.bosses.find({'_id': boss_id})[0]
     boss_title = boss_data['name']
     hex_int = int(boss_data['color'], base=16)
@@ -155,7 +155,7 @@ def update_leaderboards(db, boss_id):
         rank = 1
         return_string = ""
         for i in get_top_x(db, boss_id, category_id):
-            rsn = get_rsn(db, i['_id'])
+            rsn = get_discord_name(user_db, i['_id'])
             seconds = i[category_id]['seconds']
             m, s = divmod(seconds, 60)
             return_string+="{}. {}: {:02d}:{:02d}\n".format(rank, rsn, m, s)
