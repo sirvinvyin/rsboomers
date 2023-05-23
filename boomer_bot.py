@@ -186,7 +186,7 @@ async def category_id_autocompletion(
 ### Approval event for submitted time.
 @client.event
 async def on_raw_reaction_add(payload):
-    if (payload.message_id in pending_message_list) and str(payload.emoji) in ['✅', '❌'] and (payload.user_id in approver_list or any(role.id in role_list for role in payload.user.roles)):
+    if (payload.message_id in pending_message_list) and str(payload.emoji) in ['✅', '❌'] and (payload.user_id in approver_list or any(role.id in role_list for role in payload.member.roles)):
         guild = client.get_guild(payload.guild_id)
         channel = guild.get_channel(payload.channel_id)
         payload_message = await channel.fetch_message(payload.message_id)
