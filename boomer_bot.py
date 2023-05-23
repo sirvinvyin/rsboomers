@@ -181,7 +181,8 @@ async def category_id_autocompletion(
 ) -> List[app_commands.Choice[str]]:
     data = []
     for category_id in boss_sub_list:
-        data.append(app_commands.Choice(name=category_id, value=category_id))
+        if current in category_id:
+            data.append(app_commands.Choice(name=category_id, value=category_id))
     return data
 
 ### Approval event for submitted time.
