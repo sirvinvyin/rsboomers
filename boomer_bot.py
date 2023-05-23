@@ -33,7 +33,8 @@ server_id = db['config'].find()[0]['server_id']
 
 # Owner - 735571256526504008
 # Staff - 737466594783133777
-approver_list = [735571256526504008, 737466594783133777, 164199589614845952, 744266638857207878]
+approver_list = [164199589614845952, 744266638857207878]
+role_list = [735571256526504008, 737466594783133777, 968954059388240023]
 def is_staff(interaction: discord.Interaction):
     True if (interaction.user.id in approver_list) else False
 
@@ -53,6 +54,7 @@ def refresh_pending_messages():
     pending_message_list = []
     for item in db['pending_times'].find():
         pending_message_list.append(item['_id'])
+    pending_message_list = list(set(pending_message_list))
 
 refresh_boss_list()
 refresh_pending_messages()
@@ -114,8 +116,8 @@ async def add_boss_category(interaction, boss_id: str, update_field: str, update
 @tree.command(name = "add_rsn", description = "Add RSN", guild=discord.Object(id=server_id))
 #@app_commands.check(is_staff)
 async def add_rsn(interaction, rsn: str=None, discord_id: str=None):
-    if discord_id == None:
-        if interaction.user.id in approver_list:
+    if discord_id != None:
+        if (interaction.user.id in approver_list) or any(role.id in role_list for role in interaction.user.roles):
             discord_id = interaction.user.id
             guild = await client.fetch_guild(server_id)
             user = await guild.fetch_member(discord_id)
@@ -184,7 +186,7 @@ async def category_id_autocompletion(
 ### Approval event for submitted time.
 @client.event
 async def on_raw_reaction_add(payload):
-    if (payload.message_id in pending_message_list) and str(payload.emoji) in ['✅', '❌'] and (payload.user_id in approver_list):
+    if (payload.message_id in pending_message_list) and str(payload.emoji) in ['✅', '❌'] and (payload.user_id in approver_list or any(role.id in role_list for role in interaction.user.roles)):
         guild = client.get_guild(payload.guild_id)
         channel = guild.get_channel(payload.channel_id)
         payload_message = await channel.fetch_message(payload.message_id)
