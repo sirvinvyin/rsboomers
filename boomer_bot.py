@@ -116,9 +116,18 @@ async def add_boss_category(interaction, boss_id: str, update_field: str, update
 @tree.command(name = "add_rsn", description = "Add RSN", guild=discord.Object(id=server_id))
 #@app_commands.check(is_staff)
 async def add_rsn(interaction, rsn: str=None, discord_id: str=None):
-    if discord_id != None:
+    if discord_id == None:
+        discord_id = interaction.user.id
+        guild = await client.fetch_guild(server_id)
+        user = await guild.fetch_member(discord_id)
+        discord_name = user.nick
+        if discord_name == None:
+            discord_name = user.name
+        leaderboards_helper.add_user(user_db, discord_id, discord_name, rsn)
+        message = "RSN Added/Updated!"
+    else:
         if (interaction.user.id in approver_list) or any(role.id in role_list for role in interaction.user.roles):
-            discord_id = interaction.user.id
+            discord_id = int(discord_id)
             guild = await client.fetch_guild(server_id)
             user = await guild.fetch_member(discord_id)
             discord_name = user.nick
@@ -128,15 +137,6 @@ async def add_rsn(interaction, rsn: str=None, discord_id: str=None):
             message = "RSN Added/Updated!"
         else:
             message = "Cannot update another user's info."
-    else:
-        discord_id = int(discord_id)
-        guild = await client.fetch_guild(server_id)
-        user = await guild.fetch_member(discord_id)
-        discord_name = user.nick
-        if discord_name == None:
-            discord_name = user.name
-        leaderboards_helper.add_user(user_db, discord_id, discord_name, rsn)
-        message = "RSN Added/Updated!"
     await interaction.response.send_message(message)
 
 ### Adds time to database.
