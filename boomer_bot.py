@@ -142,7 +142,7 @@ async def add_rsn(interaction, rsn: str=None, discord_id: str=None):
 ### Adds time to database.
 @tree.command(name = "add_time", description = "Add Time", guild=discord.Object(id=server_id))
 async def add_time(interaction, boss_id: str, category_id: str, minute: int, seconds: int, discord_id: str=None):
-    seconds = minute*60+seconds
+    total_seconds = minute*60+seconds
     if discord_id == None:
         discord_id = interaction.user.id
     else:
@@ -160,7 +160,7 @@ async def add_time(interaction, boss_id: str, category_id: str, minute: int, sec
     reactions = ['✅', '❌']
     for reaction in reactions:
         await message.add_reaction(reaction)
-    leaderboards_helper.add_to_pending(db, boss_id, category_id, discord_id, seconds, message.id)
+    leaderboards_helper.add_to_pending(db, boss_id, category_id, discord_id, total_seconds, message.id)
     refresh_pending_messages()
 
 @add_time.autocomplete('boss_id')
