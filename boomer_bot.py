@@ -170,7 +170,8 @@ async def boss_id_autocompletion(
 ) -> List[app_commands.Choice[str]]:
     data = []
     for boss_id in boss_list:
-        data.append(app_commands.Choice(name=boss_id, value=boss_id))
+        if current in boss_id:
+            data.append(app_commands.Choice(name=boss_id, value=boss_id))
     return data
 
 @add_time.autocomplete('category_id')
