@@ -76,16 +76,16 @@ if db['bosses'].count_documents({})>0:
 refresh_pending_messages()
 
 ### Help command. Probably should be expanded on.
-@tree.command(name = "help", description = "help", guild=discord.Object(id=server_id))
-async def help(interaction):
-    embed = discord.Embed(title='Boss List', description="name | id", color=0x00FFFF)
-    for boss in db['bosses'].find():
-        boss_id = boss['_id']
-        field_name = '{}: {}'.format(boss['name'], boss_id)
-        boss_string = ''
-        for category in boss['categories']:
-            boss_string+='{}: {}\n'.format(boss['categories'][category]['name'], category)
-        embed.add_field(name=field_name, value=boss_string, inline=False)
+@tree.command(name = "help_leaderboard", description = "help", guild=discord.Object(id=server_id))
+async def help_leaderboard(interaction):
+    embed = discord.Embed(title='Leaderboard Commands for Boomer Bot', description="name | id", color=0x00FFFF)
+    embed.add_field(name="/add_time", value="Adds time to leaderboard. Select boss from dropdown or can type to narrow, add time in min+seconds. Requires staff approval.", inline=False)
+    embed.add_field(name="/add_rsn", value="Not required. Used for combat achievements. Will move this to combat achievements helper later.", inline=False)
+    embed.add_field(name="/add_boss", value="Adds boss to database. Should be used to add any new bosses.", inline=False)
+    embed.add_field(name="/add_boss_category", value="Adds category to boss. Eg. COX Solo CM, COX Team Normal", inline=False)
+    embed.add_field(name="/add_alias", value="Adds alias to boss for search. Eg. Tombs of Amascut can have TOA as an alias", inline=False)
+    embed.add_field(name="/update_boss", value="Used to update boss metadata. Requires familiarity with boss data structure. Eg. can change color of embed, # of records shown in leaderboard, boss name, etc", inline=False)
+    embed.add_field(name="Boss Metadata", value="boss_id: sluggified id for boss (eg. toa), boss_name: display name (eg. Tombs of Amascut), category_id: slugified category of boss if applicable. Otherwise boss_id should be used, category_name: display name of category. alias: how the boss name+category should be shown to the user (eg. Tombs of Amascut (Expert - Solo)), image_url: url for image in embed. limit: number of records shown in highscore, color: embed color HEX format (eg. 0x808080)")
     await interaction.response.send_message(embed=embed)
 
 ### Add boss command.
@@ -204,14 +204,11 @@ async def boss_id_autocompletion(
 
 ### Adds time to database for another user.
 @tree.command(name = "add_time_other", description = "Add Time For Another User", guild=discord.Object(id=server_id))
-async def add_time(interaction, boss_name: str, minute: int, seconds: int, discord_id: str):
+async def add_time_other(interaction, boss_name: str, minute: int, seconds: int, discord_id: str):
     boss_id = secondary_boss_dict[boss_name]['boss_id']
     category_id = secondary_boss_dict[boss_name]['category_id']
     total_seconds = minute*60+seconds
-    if discord_id == None:
-        discord_id = interaction.user.id
-    else:
-        discord_id = int(discord_id)
+    discord_id = int(discord_id)
     if leaderboards_helper.check_id(user_db, discord_id) == 0:
         guild = await client.fetch_guild(server_id)
         user = await guild.fetch_member(discord_id)
