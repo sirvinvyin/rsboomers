@@ -13,11 +13,12 @@ import discord
 # category_name: Display name for sub-category of boss
 # image_url: URL for image
 # limit : Number of records shown in leaderboards
-def add_boss(db, boss_id, boss_name, category_id, category_name, image_url, limit, color):
+def add_boss(db, boss_id, boss_name, category_id, category_name, alias, image_url, limit, color):
+    alias_entry = {'primary': alias, 'secondary': [alias]}
     entry = {
         '_id': boss_id,
         'name': boss_name,
-        'categories': {category_id: {'index': 0, 'name': category_name, 'limit': limit}},
+        'categories': {category_id: {'index': 0, 'name': category_name, 'alias': alias_entry, 'limit': limit}},
         'image': image_url,
         'message_id': '',
         'color': color
@@ -32,12 +33,13 @@ def add_boss(db, boss_id, boss_name, category_id, category_name, image_url, limi
         return 0
 
 ### Adds sub-category of existing boss
-def add_boss_category(db, boss_id, category_id, category_name, limit):
+def add_boss_category(db, boss_id, category_id, category_name, alias, limit):
     col = db['bosses']
+    alias_entry = {'primary': alias, 'secondary': [alias]}
     query = {"_id": boss_id}
     if col.count_documents(query) > 0:
         index = col.count_documents(query)
-        update_entry = {'index': index, 'name': category_name, 'limit': limit}
+        update_entry = {'index': index, 'name': category_name, 'alias': alias_entry, 'limit': limit}
         col.update_one(query, {"$set": {'categories.{}'.format(category_id): update_entry}})
         boss_col = db[boss_id]
         return 1
@@ -50,6 +52,16 @@ def update_boss(db, boss_id, update_field, update_value):
     query = {"_id": boss_id}
     if col.count_documents(query) > 0:
         col.update_one(query, {"$set": {update_field: update_value}})
+        print('updating boss record')
+    else:
+        print('boss does not exist. Add boss first')
+
+### Updates metadata for boss. Most useful for updating limit or image.
+def add_alias(db, boss_id, category_id, alias):
+    col = db['bosses']
+    query = {"_id": boss_id}
+    if col.count_documents(query) > 0:
+        col.update_one(query, {"$push": {'categories.{}.alias.secondary'.format(category_id): alias}}, upsert=True)
         print('updating boss record')
     else:
         print('boss does not exist. Add boss first')

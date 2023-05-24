@@ -25,6 +25,8 @@ cluster = MongoClient(mango_url)
 db = cluster[db_name]
 boss_list = []
 boss_sub_list = []
+primary_boss_dict = {}
+secondary_boss_dict = {}
 pending_message_list = []
 user_db = cluster['Users']
 
@@ -42,11 +44,23 @@ def is_staff(interaction: discord.Interaction):
 def refresh_boss_list():
     global boss_list
     global boss_sub_list
+    global primary_boss_dict
+    global secondary_boss_dict
     boss_list = []
     boss_sub_list = []
+    primary_boss_dict = {}
+    secondary_boss_dict = {}
     for boss in db['bosses'].find():
+        boss_id = boss['_id']
         boss_list.append(boss['_id'])
         for category in boss['categories']:
+            print(category)
+            category_id = category
+            primary_alias = boss['categories'][category_id]['alias']['primary']
+            input_dict = {"boss_id": boss_id, "category_id": category_id}
+            primary_boss_dict[primary_alias] = input_dict
+            for secondary_alias in boss['categories'][category_id]['alias']['secondary']:
+                secondary_boss_dict[secondary_alias] = input_dict
             boss_sub_list.append(category)
 
 def refresh_pending_messages():
@@ -56,7 +70,9 @@ def refresh_pending_messages():
         pending_message_list.append(item['_id'])
     pending_message_list = list(set(pending_message_list))
 
-refresh_boss_list()
+if db['bosses'].count_documents({})>0:
+    refresh_boss_list()
+
 refresh_pending_messages()
 
 ### Help command. Probably should be expanded on.
@@ -75,8 +91,8 @@ async def help(interaction):
 ### Add boss command.
 # 1. Adds boss to db, 2. creates boss collection 3. creates placeholder message in leaderboards channel
 @tree.command(name = "add_boss", description = "Add Boss", guild=discord.Object(id=server_id))
-async def add_boss(interaction, boss_id: str, boss_name: str, category_id: str, category_name: str, image_url: str, limit: int, color: str):
-    boss_response = leaderboards_helper.add_boss(db, boss_id, boss_name, category_id, category_name, image_url, limit, color)
+async def add_boss(interaction, boss_id: str, boss_name: str, category_id: str, category_name: str, alias: str, image_url: str, limit: int, color: str):
+    boss_response = leaderboards_helper.add_boss(db, boss_id, boss_name, category_id, category_name, alias, image_url, limit, color)
     hex_int = int(color, base=16)
     message = "Boss already exists"
     if boss_response == 1:
@@ -104,12 +120,19 @@ async def add_boss_category(interaction, boss_id: str, category_id: str, categor
 async def add_boss_category(interaction, boss_id: str, update_field: str, update_value: str):
     if 'limit' in update_field:
         update_value = int(update_value)
-    response = update_boss(db, boss_id, update_field, update_value)
+    response = leaderboards_helper.update_boss(db, boss_id, update_field, update_value)
     message = 'Boss does not exist. Enter boss via /add_boss command.'
     if response == 1:
         message = 'Boss Updated'
         refresh_boss_list()
     await interaction.response.send_message(message)
+
+### Update boss command. Used to update boss metadata for example how many records are shown in leaderboard.
+@tree.command(name = "add_alias", description = "Add Alias to Boss", guild=discord.Object(id=server_id))
+async def add_alias(interaction, boss_id: str, category_id: str, alias: str):
+    leaderboards_helper.add_alias(db, boss_id, category_id, alias)
+    refresh_boss_list()
+    await interaction.response.send_message('Alias Added')
 
 ### Map rsn/preferred name to discord_id command. Required to enter time.
 # Optional discord_id field allows another user to input a preferred name.
@@ -141,7 +164,49 @@ async def add_rsn(interaction, rsn: str=None, discord_id: str=None):
 
 ### Adds time to database.
 @tree.command(name = "add_time", description = "Add Time", guild=discord.Object(id=server_id))
-async def add_time(interaction, boss_id: str, category_id: str, minute: int, seconds: int, discord_id: str=None):
+async def add_time(interaction, boss_name: str, minute: int, seconds: int):
+    boss_id = secondary_boss_dict[boss_name]['boss_id']
+    category_id = secondary_boss_dict[boss_name]['category_id']
+    total_seconds = minute*60+seconds
+    discord_id = interaction.user.id
+    if leaderboards_helper.check_id(user_db, discord_id) == 0:
+        guild = await client.fetch_guild(server_id)
+        user = await guild.fetch_member(discord_id)
+        discord_name = user.nick
+        if discord_name == None:
+            discord_name = user.name
+        leaderboards_helper.add_user(user_db, discord_id, discord_name, None)
+    submit_message = "Submitted time: {} min {} seconds for {} {}. Pending Approval".format(minute, seconds, boss_id, category_id)
+    await interaction.response.send_message(submit_message)
+    message = await interaction.original_response()
+    reactions = ['✅', '❌']
+    for reaction in reactions:
+        await message.add_reaction(reaction)
+    leaderboards_helper.add_to_pending(db, boss_id, category_id, discord_id, total_seconds, message.id)
+    refresh_pending_messages()
+
+@add_time.autocomplete('boss_name')
+async def boss_id_autocompletion(
+    interaction: discord.Interaction,
+    current: str
+) -> List[app_commands.Choice[str]]:
+    data = []
+    primary_boss_list = list(primary_boss_dict.keys())
+    secondary_boss_list = list(secondary_boss_dict.keys())
+    if current == '':  
+        for boss_name in primary_boss_list:
+            data.append(app_commands.Choice(name=boss_name, value=boss_name))
+    else:
+        for boss_name in secondary_boss_list:
+            if current.lower() in boss_name.lower():
+                data.append(app_commands.Choice(name=boss_name, value=boss_name))
+    return data
+
+### Adds time to database for another user.
+@tree.command(name = "add_time_other", description = "Add Time For Another User", guild=discord.Object(id=server_id))
+async def add_time(interaction, boss_name: str, minute: int, seconds: int, discord_id: str):
+    boss_id = secondary_boss_dict[boss_name]['boss_id']
+    category_id = secondary_boss_dict[boss_name]['category_id']
     total_seconds = minute*60+seconds
     if discord_id == None:
         discord_id = interaction.user.id
@@ -163,26 +228,21 @@ async def add_time(interaction, boss_id: str, category_id: str, minute: int, sec
     leaderboards_helper.add_to_pending(db, boss_id, category_id, discord_id, total_seconds, message.id)
     refresh_pending_messages()
 
-@add_time.autocomplete('boss_id')
+@add_time.autocomplete('boss_name')
 async def boss_id_autocompletion(
     interaction: discord.Interaction,
     current: str
 ) -> List[app_commands.Choice[str]]:
     data = []
-    for boss_id in boss_list:
-        if current in boss_id:
-            data.append(app_commands.Choice(name=boss_id, value=boss_id))
-    return data
-
-@add_time.autocomplete('category_id')
-async def category_id_autocompletion(
-    interaction: discord.Interaction,
-    current: str
-) -> List[app_commands.Choice[str]]:
-    data = []
-    for category_id in boss_sub_list:
-        if current in category_id:
-            data.append(app_commands.Choice(name=category_id, value=category_id))
+    primary_boss_list = list(primary_boss_dict.keys())
+    secondary_boss_list = list(secondary_boss_dict.keys())
+    if current == '':  
+        for boss_name in primary_boss_list:
+            data.append(app_commands.Choice(name=boss_name, value=boss_name))
+    else:
+        for boss_name in secondary_boss_list:
+            if current.lower() in boss_name.lower():
+                data.append(app_commands.Choice(name=boss_name, value=boss_name))
     return data
 
 ### Approval event for submitted time.
