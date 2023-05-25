@@ -225,8 +225,8 @@ async def add_time_other(interaction, boss_name: str, minute: int, seconds: int,
     leaderboards_helper.add_to_pending(db, boss_id, category_id, discord_id, total_seconds, message.id)
     refresh_pending_messages()
 
-@add_time.autocomplete('boss_name')
-async def boss_id_autocompletion(
+@add_time_other.autocomplete('boss_name')
+async def boss_name_autocompletion(
     interaction: discord.Interaction,
     current: str
 ) -> List[app_commands.Choice[str]]:
