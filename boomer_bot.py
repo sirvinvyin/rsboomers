@@ -270,7 +270,7 @@ async def on_message(message):
     channel = message.channel
     # Add Brown_Circle to Gold
     if message.author.id == 194285447206273025:
-        message.add_reaction('brown_circle')
+       await message.add_reaction('🟤')
 
 # Keep Bot Alive
 randomCycle = cycle(['Runescape', 'Runescape 3'])
