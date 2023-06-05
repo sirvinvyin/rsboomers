@@ -264,14 +264,6 @@ async def on_raw_reaction_add(payload):
         db['pending_times'].delete_many(query)
         await payload_message.delete()
 
-### Add emoji reactions to message.
-@client.event
-async def on_message(message):
-    channel = message.channel
-    # Add Brown_Circle to Gold
-    if message.author.id == 194285447206273025:
-       await message.add_reaction('🟤')
-
 # Keep Bot Alive
 randomCycle = cycle(['Runescape', 'Runescape 3'])
 @tasks.loop(seconds=400)
