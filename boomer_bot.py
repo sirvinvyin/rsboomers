@@ -6,7 +6,8 @@ from discord.ext import tasks
 from typing import List
 from itertools import cycle
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
+import modals
 
 ### Configuration
 client_token = os.environ.get('token')
@@ -15,6 +16,7 @@ db_name = os.environ.get('db_name')
 
 ### Discord Connect
 intents = discord.Intents.default()
+intents.members = True
 intents.message_content = True
 client = discord.Client(intents=intents)
 tree = app_commands.CommandTree(client)
@@ -74,6 +76,7 @@ if db['bosses'].count_documents({})>0:
     refresh_boss_list()
 
 refresh_pending_messages()
+
 
 ### Help command. Probably should be expanded on.
 @tree.command(name = "help_leaderboard", description = "help", guild=discord.Object(id=server_id))
@@ -264,11 +267,27 @@ async def on_raw_reaction_add(payload):
         db['pending_times'].delete_many(query)
         await payload_message.delete()
 
+@tree.command(name = "modal_test", description = "modal_testr", guild=discord.Object(id=server_id))
+async def trymodal(interaction):
+  modal = modals.MyModal(title = "Modal via Slash Command")
+  await interaction.response.send_modal(modal)
+
 # Keep Bot Alive
 randomCycle = cycle(['Runescape', 'Runescape 3'])
 @tasks.loop(seconds=400)
 async def change_cycle():
     await client.change_presence(activity=discord.Game(next(randomCycle)))
+
+@tree.command(name = "join_dates", description = "Join Dates", guild=discord.Object(id=server_id))
+async def join_dates(interaction, days_back: int):
+  today = datetime.datetime.now()
+  compare_date = today - timedelta(days=days_back)
+  message = ""
+  for guild in client.guilds:                      
+    for member in guild.members:                     
+        message+=str(member.name)+' '+str(member.joined_at)+'\n'
+  await interaction.response.send_message(message)
+
 
 @client.event
 async def on_ready():
